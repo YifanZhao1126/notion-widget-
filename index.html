@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fg: #333333;
+    --track: #f3f3f3;
+    --bg: #ffffff;
+  }
+  html[theme="dark"], html.dark {
+    --fg: #ffffff;
+    --track: rgba(255, 255, 255, .3);
+    --bg: #191919;
+  }
+  @media (prefers-color-scheme: dark) {
+    html.auto {
+      --fg: #ffffff;
+      --track: rgba(255, 255, 255, .3);
+      --bg: #191919;
+    }
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Share Tech Mono", "Menlo", "Consolas", monospace;
+  }
+  .box {
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 12px 14px;
+    box-sizing: border-box;
+  }
+  #time {
+    margin: 0 0 14px;
+    text-align: center;
+    letter-spacing: .05em;
+    font-size: 48px;
+    line-height: 1.1;
+  }
+  .item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 13px;
+  }
+  .item > span {
+    width: 52px;
+    flex: none;
+  }
+  .item > .bar {
+    flex: 1;
+    height: 10px;
+    border-radius: 10px;
+    background: var(--track);
+    overflow: hidden;
+    margin: 0 8px;
+  }
+  .item > .bar > div {
+    height: 100%;
+    width: 0;
+    border-radius: 10px;
+    background: var(--fg);
+    transition: width .6s ease;
+  }
+  .item > em {
+    font-style: normal;
+    width: 92px;
+    flex: none;
+    text-align: right;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="box">
+  <p id="time">00:00:00</p>
+  <div id="bars"></div>
+</div>
+<script>
+(function () {
+  const q = new URLSearchParams(location.search);
+  const get = (k, d) => q.get(k) || d;
+
+  // 可通过 URL 参数覆盖：?birth=2002-11-26&phd_start=2026-09-01&phd_years=5&life_days=30000&theme=dark
+  const BIRTH     = get('birth', '2002-11-26');
+  const PHD_START = get('phd_start', '2026-09-01');
+  const PHD_YEARS = +get('phd_years', 5);
+  const LIFE_DAYS = +get('life_days', 30000);
+  const THEME     = get('theme', 'auto');           // auto | light | dark
+  const COLOR     = get('font_color', '');           // 例如 ff6600（不带 #）
+
+  document.documentElement.className = THEME;
+  if (COLOR) document.documentElement.style.setProperty('--fg', '#' + COLOR.replace('#', ''));
+
+  const DAY = 86400000;
+  const parse = s => { const [y, m, d] = s.split(/[-/.]/).map(Number); return new Date(y, m - 1, d); };
+  const today = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); };
+  const daysBetween = (a, b) => Math.round((b - a) / DAY);
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+  const rows = [
+    { key: 'year',  label: 'Year' },
+    { key: 'month', label: 'Month' },
+    { key: 'week',  label: 'Week' },
+    { key: 'phd',   label: 'PhD' },
+    { key: 'life',  label: 'Life' },
+  ];
+  const wrap = document.getElementById('bars');
+  wrap.innerHTML = rows.map(r =>
+    `<div class="item" id="${r.key}-bar"><span>${r.label}</span><div class="bar"><div></div></div><em></em></div>`
+  ).join('');
+
+  function setBar(key, cur, total) {
+    const el = document.getElementById(key + '-bar');
+    el.querySelector('.bar > div').style.width = clamp(cur * 100 / total, 0, 100) + '%';
+    el.querySelector('em').textContent = `${cur}/${total}`;
+  }
+
+  function render() {
+    const now = new Date();
+    const t = today();
+    const y = now.getFullYear();
+
+    // Week (Mon=1 … Sun=7)
+    const wd = now.getDay() || 7;
+    setBar('week', wd, 7);
+
+    // Month
+    const dim = new Date(y, now.getMonth() + 1, 0).getDate();
+    setBar('month', now.getDate(), dim);
+
+    // Year
+    const yDays = daysBetween(new Date(y, 0, 1), t) + 1;
+    const yTotal = daysBetween(new Date(y, 0, 1), new Date(y + 1, 0, 1));
+    setBar('year', yDays, yTotal);
+
+    // PhD: 从 PHD_START 起 PHD_YEARS 年
+    const ps = parse(PHD_START);
+    const pe = new Date(ps.getFullYear() + PHD_YEARS, ps.getMonth(), ps.getDate());
+    const pTotal = daysBetween(ps, pe);
+    const pCur = clamp(daysBetween(ps, t) + 1, 0, pTotal);
+    setBar('phd', pCur, pTotal);
+
+    // Life: 出生至今 / LIFE_DAYS
+    const lCur = clamp(daysBetween(parse(BIRTH), t), 0, LIFE_DAYS);
+    setBar('life', lCur, LIFE_DAYS);
+  }
+
+  function tick() {
+    const n = new Date();
+    const p = v => (v < 10 ? '0' : '') + v;
+    document.getElementById('time').textContent = `${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+  }
+
+  render();
+  tick();
+  setInterval(tick, 1000);
+  setInterval(render, 60000);
+})();
+</script>
+</body>
+</html>
