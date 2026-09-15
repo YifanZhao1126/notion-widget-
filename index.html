@@ -96,9 +96,17 @@
   const LIFE_DAYS = +get('life_days', 30000);
   const THEME     = get('theme', 'auto');           // auto | light | dark
   const COLOR     = get('font_color', '');           // 例如 ff6600（不带 #）
+  const PHD_COLOR  = get('phd_color', '4F7CE8');     // PhD 进度条颜色（蓝）
+  const LIFE_COLOR = get('life_color', 'E9873F');    // Life 进度条颜色（橙）
 
   document.documentElement.className = THEME;
   if (COLOR) document.documentElement.style.setProperty('--fg', '#' + COLOR.replace('#', ''));
+
+  const hex2rgba = (hex, a) => {
+    const h = hex.replace('#', '');
+    const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+  };
 
   const DAY = 86400000;
   const parse = s => { const [y, m, d] = s.split(/[-/.]/).map(Number); return new Date(y, m - 1, d); };
@@ -110,13 +118,18 @@
     { key: 'year',  label: 'Year' },
     { key: 'month', label: 'Month' },
     { key: 'week',  label: 'Week' },
-    { key: 'phd',   label: 'PhD' },
-    { key: 'life',  label: 'Life' },
+    { key: 'phd',   label: 'PhD',  color: PHD_COLOR },
+    { key: 'life',  label: 'Life', color: LIFE_COLOR },
   ];
   const wrap = document.getElementById('bars');
   wrap.innerHTML = rows.map(r =>
     `<div class="item" id="${r.key}-bar"><span>${r.label}</span><div class="bar"><div></div></div><em></em></div>`
   ).join('');
+  rows.filter(r => r.color).forEach(r => {
+    const el = document.getElementById(r.key + '-bar');
+    el.querySelector('.bar').style.background = hex2rgba(r.color, .2);
+    el.querySelector('.bar > div').style.background = hex2rgba(r.color, 1);
+  });
 
   function setBar(key, cur, total) {
     const el = document.getElementById(key + '-bar');
